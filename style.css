@@ -151,10 +151,31 @@ body {
   border-top: 1px solid var(--border);
 }
 .dev-credit {
-  font-size: 9px; color: var(--text-muted);
-  text-align: center; line-height: 1.6;
+  font-size: 9.5px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+  text-decoration: none;
+  display: block;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  user-select: none;
 }
-.dev-credit strong { color: var(--primary-light); }
+.dev-credit:hover {
+  background: rgba(108, 99, 255, 0.12);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+.dev-credit strong {
+  color: var(--primary-light);
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+.dev-credit:hover strong {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(108, 99, 255, 0.85);
+}
 
 /* ===== MAIN CONTENT ===== */
 .main-content {
