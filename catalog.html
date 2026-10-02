@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SH Mobile Padaviya - Digital Store & Catalog</title>
+  <meta name="description" content="Browse available mobile phones, accessories, spare parts, and warranty products at SH Mobile Padaviya.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #0f1629;
+      --bg-card: #141b2d;
+      --bg-card-hover: #1a233a;
+      --primary: #6c63ff;
+      --primary-light: #8b85ff;
+      --accent-blue: #4fc3f7;
+      --accent-green: #69f0ae;
+      --accent-orange: #ffb74d;
+      --accent-red: #ef5350;
+      --text-primary: #e8eaf6;
+      --text-secondary: #8892b0;
+      --text-muted: #5a6480;
+      --border: rgba(108, 99, 255, 0.15);
+      --border-hover: rgba(108, 99, 255, 0.35);
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      --radius: 14px;
+      --radius-sm: 8px;
+      --font: 'Inter', sans-serif;
+      --font-heading: 'Poppins', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ===== NAVBAR ===== */
+    .catalog-nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15, 22, 41, 0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+    }
+    .nav-container {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 16px;
+    }
+    .nav-brand {
+      display: flex; align-items: center; gap: 12px;
+      text-decoration: none; color: inherit;
+    }
+    .brand-logo {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--primary), var(--accent-blue));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; box-shadow: 0 0 20px rgba(108,99,255,0.4);
+    }
+    .brand-title {
+      font-family: var(--font-heading);
+      font-size: 18px; font-weight: 800;
+      line-height: 1.1;
+    }
+    .brand-sub {
+      font-size: 11px; color: var(--primary-light); font-weight: 500;
+    }
+    .nav-actions {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .btn-contact {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 20px;
+      font-size: 12px; font-weight: 700;
+      text-decoration: none; cursor: pointer;
+      transition: all 0.25s ease;
+      border: 1px solid transparent;
+    }
+    .btn-wa {
+      background: #25D366; color: #000;
+    }
+    .btn-wa:hover {
+      background: #20bd5a; transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4);
+    }
+    .btn-call {
+      background: rgba(108,99,255,0.15); color: var(--primary-light);
+      border-color: var(--border);
+    }
+    .btn-call:hover {
+      background: rgba(108,99,255,0.3); border-color: var(--primary);
+    }
+
+    /* ===== HERO SECTION ===== */
+    .hero {
+      background: radial-gradient(circle at 50% 20%, rgba(108,99,255,0.15) 0%, transparent 60%);
+      padding: 36px 20px 24px;
+      text-align: center;
+    }
+    .hero-container {
+      max-width: 800px; margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--accent-green);
+      background: rgba(105, 240, 174, 0.1); border: 1px solid rgba(105, 240, 174, 0.25);
+      padding: 4px 14px; border-radius: 20px; margin-bottom: 12px;
+    }
+    .hero-title {
+      font-family: var(--font-heading);
+      font-size: clamp(24px, 4vw, 36px); font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .hero-title span {
+      background: linear-gradient(135deg, var(--primary-light), var(--accent-blue));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      font-size: 14px; color: var(--text-secondary);
+      max-width: 600px; margin: 0 auto 24px; line-height: 1.5;
+    }
+
+    /* ===== SEARCH & FILTER ===== */
+    .filter-bar {
+      max-width: 1200px; margin: 0 auto 24px; padding: 0 20px;
+    }
+    .search-box {
+      position: relative; margin-bottom: 16px;
+    }
+    .search-input {
+      width: 100%; padding: 14px 20px 14px 46px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary); font-family: var(--font); font-size: 14px;
+      outline: none; transition: all 0.25s ease;
+      box-shadow: var(--shadow);
+    }
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.15), var(--shadow);
+    }
+    .search-icon {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      font-size: 18px; color: var(--text-secondary); pointer-events: none;
+    }
+
+    .category-pills {
+      display: flex; gap: 8px; overflow-x: auto;
+      padding-bottom: 6px; scrollbar-width: none;
+    }
+    .category-pills::-webkit-scrollbar { display: none; }
+    .cat-pill {
+      padding: 8px 16px; border-radius: 20px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s ease;
+    }
+    .cat-pill:hover, .cat-pill.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white; border-color: transparent;
+      box-shadow: 0 4px 14px rgba(108,99,255,0.3);
+    }
+
+    /* ===== PRODUCTS GRID ===== */
+    .products-section {
+      max-width: 1200px; margin: 0 auto; padding: 0 20px 60px;
+      flex: 1; width: 100%;
+    }
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; font-size: 13px; color: var(--text-secondary);
+    }
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .product-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      transition: all 0.25s ease;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+    .product-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-hover);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+
+    .product-media {
+      position: relative;
+      width: 100%; height: 200px;
+      background: rgba(255,255,255,0.02);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .product-media img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    .product-card:hover .product-media img {
+      transform: scale(1.04);
+    }
+    .product-fallback-icon {
+      font-size: 56px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+    }
+    .badge-stock {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px;
+      backdrop-filter: blur(8px);
+    }
+    .badge-in-stock { background: rgba(105, 240, 174, 0.2); color: var(--accent-green); border: 1px solid rgba(105,240,174,0.3); }
+    .badge-out-stock { background: rgba(239, 83, 80, 0.2); color: var(--accent-red); border: 1px solid rgba(239,83,80,0.3); }
+
+    .badge-cat {
+      position: absolute; bottom: 12px; left: 12px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 12px;
+      background: rgba(10, 14, 26, 0.75); color: var(--primary-light);
+      border: 1px solid var(--border);
+    }
+
+    .product-body {
+      padding: 16px;
+      display: flex; flex-direction: column; flex: 1;
+    }
+    .product-brand {
+      font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .product-name {
+      font-family: var(--font-heading);
+      font-size: 15px; font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .product-warranty {
+      font-size: 11px; color: var(--accent-blue);
+      display: flex; align-items: center; gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .product-footer {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .product-price {
+      font-size: 18px; font-weight: 900;
+      color: var(--accent-green);
+      font-family: var(--font-heading);
+    }
+    .btn-buy-wa {
+      background: #25D366; color: #000;
+      padding: 8px 14px; border-radius: var(--radius-sm);
+      font-size: 11px; font-weight: 700;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn-buy-wa:hover {
+      background: #1eb855; transform: scale(1.03);
+    }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-state span { font-size: 48px; display: block; margin-bottom: 12px; }
+
+    /* ===== FOOTER ===== */
+    .catalog-footer {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 30px 20px 20px;
+      text-align: center;
+      font-size: 12px; color: var(--text-secondary);
+    }
+    .footer-brand {
+      font-size: 16px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;
+    }
+    .footer-credit {
+      margin-top: 16px; font-size: 10px; color: var(--text-muted);
+    }
+    .footer-credit strong { color: var(--primary-light); }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="catalog-nav">
+    <div class="nav-container">
+      <a href="javascript:void(0)" class="nav-brand">
+        <div class="brand-logo">📱</div>
+        <div>
+          <div class="brand-title" id="shopNameDisplay">SH Mobile</div>
+          <div class="brand-sub" id="shopTaglineDisplay">Padaviya • Digital Store</div>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <a id="btnCallShop" href="tel:0785336459" class="btn-contact btn-call">
+          <span>📞 Call</span>
+        </a>
+        <a id="btnWaShop" href="https://wa.me/94785336459" target="_blank" class="btn-contact btn-wa">
+          <span>💬 WhatsApp</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-container">
+      <div class="hero-badge">🟢 Live Stock & Catalog</div>
+      <h1 class="hero-title">Browse Our <span>Latest Mobile Products</span></h1>
+      <p class="hero-sub" id="shopAddressDisplay">
+        Quality smartphones, premium accessories, original spare parts & trusted repairs.
+      </p>
+    </div>
+  </header>
+
+  <!-- Filter & Search Bar -->
+  <section class="filter-bar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="catalogSearch" class="search-input" placeholder="Search phones, accessories, brands (e.g. Samsung, A55)..." oninput="filterCatalog()">
+    </div>
+    <div class="category-pills" id="categoryPills">
+      <button class="cat-pill active" onclick="selectCategory('all', this)">All Products</button>
+    </div>
+  </section>
+
+  <!-- Products Showcase -->
+  <main class="products-section">
+    <div class="section-header">
+      <span id="productCountDisplay">Showing all products</span>
+      <span id="lastUpdatedDisplay">Live Sync Active</span>
+    </div>
+    <div class="product-grid" id="catalogGrid">
+      <!-- Products render dynamically -->
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="catalog-footer">
+    <div class="footer-brand" id="footerShopName">SH Mobile Padaviya</div>
+    <p id="footerContactInfo">📞 078-533-6459 | Padaviya, Sri Lanka</p>
+    <p style="margin-top:6px;">Official Digital Product Showcase & Retail Store</p>
+    <div class="footer-credit">Design & Develop By <strong>SMARTZONE LK</strong></div>
+  </footer>
+
+  <script>
+    // Category emoji icons fallback
+    const categoryIcons = {
+      'Phones': '📱',
+      'Accessories': '🎧',
+      'Spare Parts': '🔧',
+      'Tablets': '📟',
+      'Other': '📦'
+    };
+
+    let storeData = {
+      products: [],
+      categories: ['Phones', 'Accessories', 'Spare Parts', 'Tablets', 'Other'],
+      settings: {
+        shopName: 'SH Mobile Padaviya',
+        phone: '078-533-6459',
+        address: 'Padaviya, Sri Lanka',
+        currency: 'Rs.'
+      }
+    };
+
+    let selectedCategory = 'all';
+
+    function loadStoreData() {
+      try {
+        const saved = localStorage.getItem('sh_mobile_erp_v2');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          storeData = { ...storeData, ...parsed };
+        }
+      } catch (e) {
+        console.warn('Catalog load error:', e);
+      }
+
+      // If products empty, provide nice fallback demo products
+      if (!storeData.products || storeData.products.length === 0) {
+        storeData.products = [
+          { id: 'P1', name: 'Samsung Galaxy A55', category: 'Phones', brand: 'Samsung', model: 'A55', sellPrice: 65000, stock: 10, warrantyPeriod: 12, warrantyUnit: 'months' },
+          { id: 'P2', name: 'iPhone 15 Screen Replacement', category: 'Spare Parts', brand: 'Apple', model: 'iPhone 15', sellPrice: 16000, stock: 5, warrantyPeriod: 3, warrantyUnit: 'months' },
+          { id: 'P3', name: 'USB-C Fast Charging Cable 1m', category: 'Accessories', brand: 'Generic', model: '', sellPrice: 600, stock: 50, warrantyPeriod: 0 },
+          { id: 'P4', name: 'Realme C65 (8GB / 256GB)', category: 'Phones', brand: 'Realme', model: 'C65', sellPrice: 38000, stock: 7, warrantyPeriod: 12, warrantyUnit: 'months' },
+          { id: 'P5', name: 'Tempered Glass Screen Guard', category: 'Accessories', brand: 'Generic', model: '', sellPrice: 250, stock: 100, warrantyPeriod: 0 }
+        ];
+      }
+
+      updateShopHeader();
+      renderCategoryPills();
+      renderCatalogProducts();
+    }
+
+    function updateShopHeader() {
+      const s = storeData.settings || {};
+      const name = s.shopName || 'SH Mobile Padaviya';
+      const phone = s.phone || '078-533-6459';
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const intlPhone = cleanPhone.startsWith('0') ? '94' + cleanPhone.slice(1) : cleanPhone;
+
+      document.getElementById('shopNameDisplay').textContent = name;
+      document.getElementById('footerShopName').textContent = name;
+      document.getElementById('shopAddressDisplay').textContent = s.address ? `📍 ${s.address} • 📞 ${phone}` : `Quality smartphones, accessories & repairs • 📞 ${phone}`;
+      document.getElementById('footerContactInfo').textContent = `📞 ${phone} ${s.address ? `| 📍 ${s.address}` : ''}`;
+
+      document.getElementById('btnCallShop').href = `tel:${phone}`;
+      document.getElementById('btnWaShop').href = `https://wa.me/${intlPhone}?text=${encodeURIComponent('Hello ' + name + ', I would like to inquire about your products.')}`;
+    }
+
+    function renderCategoryPills() {
+      const container = document.getElementById('categoryPills');
+      const cats = storeData.categories || ['Phones', 'Accessories', 'Spare Parts', 'Tablets', 'Other'];
+      container.innerHTML = `
+        <button class="cat-pill ${selectedCategory === 'all' ? 'active' : ''}" onclick="selectCategory('all', this)">All Products</button>
+        ${cats.map(c => `<button class="cat-pill ${selectedCategory === c ? 'active' : ''}" onclick="selectCategory('${c}', this)">${c}</button>`).join('')}
+      `;
+    }
+
+    function selectCategory(cat, btn) {
+      selectedCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderCatalogProducts();
+    }
+
+    function filterCatalog() {
+      renderCatalogProducts();
+    }
+
+    function renderCatalogProducts() {
+      const query = (document.getElementById('catalogSearch').value || '').trim().toLowerCase();
+      const grid = document.getElementById('catalogGrid');
+      const currency = storeData.settings.currency || 'Rs.';
+
+      let list = storeData.products || [];
+
+      // Filter by category
+      if (selectedCategory !== 'all') {
+        list = list.filter(p => p.category === selectedCategory);
+      }
+
+      // Filter by search query
+      if (query) {
+        list = list.filter(p =>
+          p.name.toLowerCase().includes(query) ||
+          (p.brand && p.brand.toLowerCase().includes(query)) ||
+          (p.model && p.model.toLowerCase().includes(query)) ||
+          (p.category && p.category.toLowerCase().includes(query))
+        );
+      }
+
+      document.getElementById('productCountDisplay').textContent = `Showing ${list.length} product${list.length === 1 ? '' : 's'}`;
+
+      if (list.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <span>🔍</span>
+            <h3>No products found</h3>
+            <p>Try searching for a different item or category.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const s = storeData.settings || {};
+      const phone = s.phone || '078-533-6459';
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const intlPhone = cleanPhone.startsWith('0') ? '94' + cleanPhone.slice(1) : cleanPhone;
+
+      grid.innerHTML = list.map(p => {
+        const inStock = p.stock > 0;
+        const stockText = inStock ? (p.stock <= 5 ? `Low Stock (${p.stock} left)` : `In Stock`) : `Out of Stock`;
+        const stockClass = inStock ? 'badge-in-stock' : 'badge-out-stock';
+        const priceStr = `${currency} ${parseFloat(p.sellPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        const waMsg = encodeURIComponent(
+          `Hello ${s.shopName || 'SH Mobile'}!\nI am interested in buying:\n*${p.name}*\nPrice: ${priceStr}\nIs this item available in stock?`
+        );
+        const waLink = `https://wa.me/${intlPhone}?text=${waMsg}`;
+
+        return `
+          <div class="product-card">
+            <div class="product-media">
+              ${p.image
+                ? `<img src="${p.image}" alt="${p.name}">`
+                : `<div class="product-fallback-icon">${categoryIcons[p.category] || '📦'}</div>`}
+              <span class="badge-stock ${stockClass}">${stockText}</span>
+              <span class="badge-cat">${p.category || 'General'}</span>
+            </div>
+            <div class="product-body">
+              <div class="product-brand">${p.brand ? `${p.brand} ${p.model ? `• ${p.model}` : ''}` : ''}</div>
+              <h3 class="product-name">${p.name}</h3>
+              ${p.warrantyPeriod > 0
+                ? `<div class="product-warranty">🛡️ ${p.warrantyPeriod} ${p.warrantyUnit || 'Months'} Warranty</div>`
+                : `<div class="product-warranty" style="color:var(--text-muted)">✔️ Quality Guaranteed</div>`}
+              <div class="product-footer">
+                <div class="product-price">${priceStr}</div>
+                <a href="${waLink}" target="_blank" class="btn-buy-wa" title="Send WhatsApp Message">
+                  <span>💬 Buy / Ask</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Auto-sync when ERP changes
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'sh_mobile_erp_v2') {
+        loadStoreData();
+      }
+    });
+
+    // Initialize catalog
+    loadStoreData();
+  </script>
+</body>
+</html>
