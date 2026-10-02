@@ -11,6 +11,9 @@ let db = {
   warranty: [],
   customers: [],
   expenses: [],
+  suppliers: [],
+  supplierPayments: [],
+  supplierPurchases: [],
   categories: ['Phones', 'Accessories', 'Spare Parts', 'Tablets', 'Other'],
   settings: {
     shopName: 'SH Mobile Padaviya',
@@ -61,6 +64,14 @@ function loadData() {
       if (db.settings) {
         if (!db.settings.invoiceSettings) db.settings.invoiceSettings = {};
         db.settings.invoiceSettings.devCredit = 'Develop By SMARTZONE LK';
+      }
+
+      // Ensure suppliers & supplier payments compatibility
+      if (!Array.isArray(db.suppliers)) db.suppliers = [];
+      if (!Array.isArray(db.supplierPayments)) db.supplierPayments = [];
+      if (!Array.isArray(db.supplierPurchases)) db.supplierPurchases = [];
+      if (db.suppliers.length === 0) {
+        seedInitialSuppliers();
       }
 
       // Ensure wholesalePrice & shopPrice backward compatibility for existing products
@@ -114,6 +125,7 @@ function showPage(pageId, element) {
     sales: ['Sales History', 'View all sale transactions'],
     profit: ['Profit & Loss', 'Financial analysis and reports'],
     customers: ['Customers', 'Customer database management'],
+    suppliers: ['Suppliers & Payments', 'Manage suppliers, purchases & payables'],
     expenses: ['Expenses', 'Track business expenses'],
     settings: ['Settings', 'System configuration']
   };
@@ -135,6 +147,7 @@ function showPage(pageId, element) {
     setTimeout(() => { if (profitChart) profitChart.resize(); }, 50);
   }
   if (pageId === 'customers') renderCustomers();
+  if (pageId === 'suppliers') renderSuppliersModule();
   if (pageId === 'expenses') renderExpenses();
   if (pageId === 'pos') initPOS();
   if (pageId === 'barcode') initBarcodeSelect();
@@ -292,6 +305,7 @@ function updateDashboard() {
   renderRecentRepairs();
   renderLowStockAlert();
   renderRecentSalesDash();
+  renderSupplierPayablesDash();
   renderSalesChart();
 }
 
@@ -339,6 +353,29 @@ function renderRecentSalesDash() {
       </div>
       <div class="list-item-value">
         <div style="color:var(--accent-green);font-weight:800">${fmt(s.total)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSupplierPayablesDash() {
+  const el = document.getElementById('supplierPayablesDashList');
+  if (!el) return;
+  const dues = (db.suppliers || []).map(s => ({ ...s, stats: getSupplierStats(s.id) }))
+    .filter(s => s.stats.due > 0).sort((a, b) => b.stats.due - a.stats.due).slice(0, 5);
+  if (dues.length === 0) {
+    el.innerHTML = '<div class="empty-state-sm">No supplier dues ✓</div>';
+    return;
+  }
+  el.innerHTML = dues.map(s => `
+    <div class="list-item" style="cursor:pointer;" onclick="openSupplierPaymentModal('${s.id}')" title="Click to pay ${s.name}">
+      <div>
+        <div class="list-item-name">${s.name} ${s.company ? `<span style="font-size:11px;color:var(--text-muted);font-weight:normal;">(${s.company})</span>` : ''}</div>
+        <div class="list-item-sub">📞 ${s.phone} | Purchases: ${fmt(s.stats.totalPurchases)}</div>
+      </div>
+      <div style="text-align:right;">
+        <span class="due-badge has-due">Due: ${fmt(s.stats.due)}</span>
+        <div style="font-size:11px;color:var(--accent-blue);font-weight:600;margin-top:2px;">💳 Pay Now ➔</div>
       </div>
     </div>
   `).join('');
@@ -2247,6 +2284,948 @@ function renderExpenses() {
   `).join('');
 }
 
+// ===== SUPPLIERS & SUPPLIER PAYMENTS =====
+let currentSupplierTab = 'directory';
+
+function getSupplierStats(supplierId) {
+  const sup = (db.suppliers || []).find(s => s.id === supplierId);
+  const opening = parseFloat(sup?.openingBalance) || 0;
+  const purchases = (db.supplierPurchases || []).filter(p => p.supplierId === supplierId);
+  const totalPurchases = purchases.reduce((a, b) => a + (parseFloat(b.totalAmount) || 0), 0) + opening;
+  const payments = (db.supplierPayments || []).filter(p => p.supplierId === supplierId);
+  const totalPaid = payments.reduce((a, b) => a + (parseFloat(b.amount) || 0), 0);
+  const due = Math.max(0, totalPurchases - totalPaid);
+  return { totalPurchases, totalPaid, due, countPurchases: purchases.length, countPayments: payments.length };
+}
+
+function getOverallSupplierStats() {
+  let totalPurchases = 0;
+  let totalPaid = 0;
+  let totalDue = 0;
+  (db.suppliers || []).forEach(s => {
+    const st = getSupplierStats(s.id);
+    totalPurchases += st.totalPurchases;
+    totalPaid += st.totalPaid;
+    totalDue += st.due;
+  });
+  return {
+    count: (db.suppliers || []).length,
+    totalPurchases,
+    totalPaid,
+    totalDue
+  };
+}
+
+function switchSupplierTab(tab) {
+  currentSupplierTab = tab;
+  ['suppliers', 'payments', 'purchases'].forEach(t => {
+    const btn = document.getElementById('tabBtn-' + t);
+    if (btn) btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(tab === 'directory' ? 'tabBtn-suppliers' : (tab === 'payments' ? 'tabBtn-payments' : 'tabBtn-purchases'));
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const panes = ['directory', 'payments', 'purchases'];
+  panes.forEach(p => {
+    const pane = document.getElementById('supplierTabContent-' + p);
+    if (pane) pane.style.display = p === tab ? 'block' : 'none';
+  });
+
+  if (tab === 'directory') renderSuppliersTable();
+  else if (tab === 'payments') renderSupplierPaymentsTable();
+  else if (tab === 'purchases') renderSupplierPurchasesTable();
+}
+
+function renderSuppliersModule() {
+  const stats = getOverallSupplierStats();
+  if (document.getElementById('supTotalCount')) document.getElementById('supTotalCount').textContent = stats.count;
+  if (document.getElementById('supTotalPurchases')) document.getElementById('supTotalPurchases').textContent = fmt(stats.totalPurchases);
+  if (document.getElementById('supTotalPayments')) document.getElementById('supTotalPayments').textContent = fmt(stats.totalPaid);
+  if (document.getElementById('supTotalDue')) document.getElementById('supTotalDue').textContent = fmt(stats.totalDue);
+
+  if (document.getElementById('badgeSupCount')) document.getElementById('badgeSupCount').textContent = (db.suppliers || []).length;
+  if (document.getElementById('badgePaymentCount')) document.getElementById('badgePaymentCount').textContent = (db.supplierPayments || []).length;
+  if (document.getElementById('badgePurchasesCount')) document.getElementById('badgePurchasesCount').textContent = (db.supplierPurchases || []).length;
+
+  populateSupplierDropdowns();
+  switchSupplierTab(currentSupplierTab || 'directory');
+  renderSupplierPayablesDash();
+}
+
+function populateSupplierDropdowns() {
+  const spSel = document.getElementById('spSupplierSelect');
+  const purSel = document.getElementById('purSupplierSelect');
+  const payFilter = document.getElementById('supplierPaymentFilter');
+  const purFilter = document.getElementById('supplierPurchaseFilter');
+
+  const options = (db.suppliers || []).map(s => {
+    const st = getSupplierStats(s.id);
+    return `<option value="${s.id}">${s.name} ${s.company ? `(${s.company})` : ''} - Due: ${fmt(st.due)}</option>`;
+  }).join('');
+
+  if (spSel) {
+    const cur = spSel.value;
+    spSel.innerHTML = '<option value="">-- Choose Supplier --</option>' + options;
+    spSel.value = cur;
+  }
+  if (purSel) {
+    const cur = purSel.value;
+    purSel.innerHTML = '<option value="">-- Choose Supplier --</option>' + options;
+    purSel.value = cur;
+  }
+
+  const filterOptions = '<option value="">All Suppliers</option>' + (db.suppliers || []).map(s =>
+    `<option value="${s.id}">${s.name} ${s.company ? `(${s.company})` : ''}</option>`
+  ).join('');
+
+  if (payFilter) {
+    const cur = payFilter.value;
+    payFilter.innerHTML = filterOptions;
+    payFilter.value = cur;
+  }
+  if (purFilter) {
+    const cur = purFilter.value;
+    purFilter.innerHTML = filterOptions;
+    purFilter.value = cur;
+  }
+}
+
+function renderSuppliersTable() {
+  const search = (document.getElementById('supplierSearch')?.value || '').toLowerCase().trim();
+  let list = (db.suppliers || []).filter(s => {
+    if (!search) return true;
+    return (s.name || '').toLowerCase().includes(search) ||
+      (s.company || '').toLowerCase().includes(search) ||
+      (s.phone || '').includes(search) ||
+      (s.categories || '').toLowerCase().includes(search) ||
+      (s.address || '').toLowerCase().includes(search);
+  });
+
+  const summary = document.getElementById('supplierListSummary');
+  if (summary) summary.textContent = `Showing ${list.length} of ${(db.suppliers || []).length} suppliers`;
+
+  const tbody = document.getElementById('suppliersTableBody');
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">No suppliers found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map((s, i) => {
+    const st = getSupplierStats(s.id);
+    const cleanPhone = (s.phone || '').replace(/[^0-9]/g, '');
+    const waPhone = cleanPhone.startsWith('0') ? '94' + cleanPhone.slice(1) : cleanPhone;
+
+    return `
+      <tr>
+        <td>${i + 1}</td>
+        <td>
+          <div style="font-weight:700;color:var(--text-primary);">${s.name}</div>
+          ${s.company ? `<div style="font-size:11px;color:var(--accent-blue);font-weight:600;">🏢 ${s.company}</div>` : ''}
+          ${s.bankInfo ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">🏦 ${s.bankInfo}</div>` : ''}
+        </td>
+        <td>
+          <div>📞 <a href="tel:${s.phone}" style="color:var(--primary-light);font-weight:600;text-decoration:none;">${s.phone}</a></div>
+          ${cleanPhone ? `<div style="margin-top:2px;"><a href="https://wa.me/${waPhone}" target="_blank" style="font-size:11px;color:#25d366;text-decoration:none;">💬 WhatsApp</a></div>` : ''}
+          ${s.address ? `<div style="font-size:10.5px;color:var(--text-muted);">${s.address}</div>` : ''}
+        </td>
+        <td>
+          ${s.categories ? `<span class="badge badge-purple">${s.categories}</span>` : '<span style="color:var(--text-muted);font-size:11px;">-</span>'}
+        </td>
+        <td style="font-weight:600;color:var(--text-primary);">${fmt(st.totalPurchases)}</td>
+        <td style="font-weight:600;color:var(--accent-green);">${fmt(st.totalPaid)}</td>
+        <td>
+          ${st.due > 0
+            ? `<span class="due-badge has-due">Due: ${fmt(st.due)}</span>`
+            : '<span class="due-badge cleared">✓ Cleared</span>'}
+        </td>
+        <td>
+          <div class="action-group" style="flex-wrap:wrap;gap:4px;">
+            <button class="btn-sm btn-green" onclick="openSupplierPaymentModal('${s.id}')" title="Make Payment">💳 Pay</button>
+            <button class="btn-sm btn-secondary" onclick="openSupplierPurchaseModal('${s.id}')" title="Add Purchase Bill">📥 Bill</button>
+            <button class="btn-sm btn-secondary" onclick="openSupplierLedger('${s.id}')" title="View Statement / Ledger">📋 History</button>
+            <button class="btn-sm btn-secondary" onclick="openSupplierModal('${s.id}')" title="Edit Supplier">✏️</button>
+            <button class="btn-sm btn-danger" onclick="deleteSupplier('${s.id}')" title="Delete Supplier">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Supplier Modal CRUD
+function openSupplierModal(id = null) {
+  document.getElementById('supplierModalTitle').textContent = id ? 'Edit Supplier' : 'Add Supplier';
+  document.getElementById('editSupplierId').value = id || '';
+
+  if (id) {
+    const s = (db.suppliers || []).find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('supName').value = s.name || '';
+    document.getElementById('supCompany').value = s.company || '';
+    document.getElementById('supPhone').value = s.phone || '';
+    document.getElementById('supEmail').value = s.email || '';
+    document.getElementById('supCategories').value = s.categories || '';
+    document.getElementById('supAddress').value = s.address || '';
+    document.getElementById('supBankInfo').value = s.bankInfo || '';
+    document.getElementById('supOpeningBalance').value = s.openingBalance || 0;
+    document.getElementById('supNotes').value = s.notes || '';
+  } else {
+    document.getElementById('supName').value = '';
+    document.getElementById('supCompany').value = '';
+    document.getElementById('supPhone').value = '';
+    document.getElementById('supEmail').value = '';
+    document.getElementById('supCategories').value = '';
+    document.getElementById('supAddress').value = '';
+    document.getElementById('supBankInfo').value = '';
+    document.getElementById('supOpeningBalance').value = '0';
+    document.getElementById('supNotes').value = '';
+  }
+  openModal('supplierModal');
+}
+
+function saveSupplier() {
+  const name = document.getElementById('supName').value.trim();
+  const phone = document.getElementById('supPhone').value.trim();
+  if (!name || !phone) { toast('Supplier name and phone are required!', 'error'); return; }
+
+  const editId = document.getElementById('editSupplierId').value;
+  const s = {
+    id: editId || 'SUP' + Date.now(),
+    name,
+    company: document.getElementById('supCompany').value.trim(),
+    phone,
+    email: document.getElementById('supEmail').value.trim(),
+    categories: document.getElementById('supCategories').value.trim(),
+    address: document.getElementById('supAddress').value.trim(),
+    bankInfo: document.getElementById('supBankInfo').value.trim(),
+    openingBalance: parseFloat(document.getElementById('supOpeningBalance').value) || 0,
+    notes: document.getElementById('supNotes').value.trim(),
+    createdAt: editId ? (db.suppliers || []).find(x => x.id === editId)?.createdAt : new Date().toISOString()
+  };
+
+  if (!db.suppliers) db.suppliers = [];
+  const idx = db.suppliers.findIndex(x => x.id === s.id);
+  if (idx >= 0) db.suppliers[idx] = s;
+  else db.suppliers.push(s);
+
+  saveData();
+  closeModal('supplierModal');
+  renderSuppliersModule();
+  toast('Supplier saved successfully! ✅', 'success');
+}
+
+function deleteSupplier(id) {
+  const sup = (db.suppliers || []).find(s => s.id === id);
+  if (!sup) return;
+  const st = getSupplierStats(id);
+  if (st.due > 0) {
+    if (!confirm(`⚠️ This supplier has an outstanding due balance of ${fmt(st.due)}! Are you sure you want to delete?`)) return;
+  } else {
+    if (!confirm(`Delete supplier "${sup.name}"?`)) return;
+  }
+
+  db.suppliers = (db.suppliers || []).filter(s => s.id !== id);
+  saveData();
+  renderSuppliersModule();
+  toast('Supplier deleted', 'warning');
+}
+
+// ===== SUPPLIER PAYMENTS CRUD =====
+function openSupplierPaymentModal(supplierId = null) {
+  populateSupplierDropdowns();
+  document.getElementById('editPaymentId').value = '';
+  document.getElementById('supplierPaymentModalTitle').textContent = '💳 Make Supplier Payment';
+  document.getElementById('spDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('spAmount').value = '';
+  document.getElementById('spMethod').value = 'cash';
+  document.getElementById('spReference').value = '';
+  document.getElementById('spChequeNo').value = '';
+  document.getElementById('spChequeDate').value = '';
+  document.getElementById('spBankName').value = '';
+  document.getElementById('spNotes').value = '';
+
+  const sel = document.getElementById('spSupplierSelect');
+  if (supplierId && sel) {
+    sel.value = supplierId;
+  }
+  onSupplierPaymentSelectChanged();
+  toggleSupplierPaymentMethodFields();
+  openModal('supplierPaymentModal');
+}
+
+function onSupplierPaymentSelectChanged() {
+  const sel = document.getElementById('spSupplierSelect');
+  const alertEl = document.getElementById('spSupplierDueAlert');
+  if (!sel || !alertEl) return;
+
+  const id = sel.value;
+  if (!id) {
+    alertEl.style.display = 'none';
+    return;
+  }
+
+  const s = (db.suppliers || []).find(x => x.id === id);
+  const st = getSupplierStats(id);
+  alertEl.style.display = 'block';
+  if (st.due > 0) {
+    alertEl.innerHTML = `<span style="color:#ef5350;">⚠️ Outstanding Due Balance: ${fmt(st.due)}</span> ${s?.bankInfo ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Bank: ${s.bankInfo}</div>` : ''}`;
+    const amtInput = document.getElementById('spAmount');
+    if (amtInput && !amtInput.value) amtInput.value = st.due;
+  } else {
+    alertEl.innerHTML = `<span style="color:#00e676;">✓ No outstanding balance due to this supplier.</span>`;
+  }
+}
+
+function toggleSupplierPaymentMethodFields() {
+  const method = document.getElementById('spMethod')?.value || 'cash';
+  const chequeFields = document.getElementById('spChequeFields');
+  const refLabel = document.getElementById('spRefLabel');
+
+  if (method === 'cheque') {
+    if (chequeFields) chequeFields.style.display = 'grid';
+    if (refLabel) refLabel.textContent = 'Cheque Remarks / Ref';
+  } else if (method === 'bank') {
+    if (chequeFields) chequeFields.style.display = 'none';
+    if (refLabel) refLabel.textContent = 'Bank Slip # / Reference *';
+  } else {
+    if (chequeFields) chequeFields.style.display = 'none';
+    if (refLabel) refLabel.textContent = 'Receipt / Ref # (Optional)';
+  }
+}
+
+function saveSupplierPayment() {
+  const supplierId = document.getElementById('spSupplierSelect')?.value;
+  const date = document.getElementById('spDate')?.value;
+  const amount = parseFloat(document.getElementById('spAmount')?.value);
+  const method = document.getElementById('spMethod')?.value || 'cash';
+
+  if (!supplierId) { toast('Please choose a supplier!', 'error'); return; }
+  if (!date || isNaN(amount) || amount <= 0) { toast('Please enter a valid payment amount & date!', 'error'); return; }
+
+  const sup = (db.suppliers || []).find(s => s.id === supplierId);
+  const chequeNo = document.getElementById('spChequeNo')?.value.trim() || '';
+  const chequeDate = document.getElementById('spChequeDate')?.value || '';
+  const bankName = document.getElementById('spBankName')?.value.trim() || (sup?.bankInfo || '');
+  const reference = document.getElementById('spReference')?.value.trim() || '';
+  const notes = document.getElementById('spNotes')?.value.trim() || '';
+
+  if (method === 'cheque' && !chequeNo) {
+    toast('Please enter the cheque number!', 'warning'); return;
+  }
+
+  const payment = {
+    id: 'SPAY' + Date.now().toString().slice(-7),
+    supplierId,
+    supplierName: sup ? (sup.company ? `${sup.name} (${sup.company})` : sup.name) : 'Supplier',
+    date,
+    amount,
+    paymentMethod: method,
+    reference,
+    chequeNo,
+    chequeDate,
+    bankName,
+    notes,
+    createdAt: new Date().toISOString()
+  };
+
+  if (!db.supplierPayments) db.supplierPayments = [];
+  db.supplierPayments.push(payment);
+  saveData();
+
+  closeModal('supplierPaymentModal');
+  renderSuppliersModule();
+  toast(`Payment of ${fmt(amount)} issued successfully! 💳`, 'success');
+  showSupplierVoucher(payment);
+}
+
+function deleteSupplierPayment(paymentId) {
+  if (!confirm('Delete this supplier payment record? Balance will be recalculated.')) return;
+  db.supplierPayments = (db.supplierPayments || []).filter(p => p.id !== paymentId);
+  saveData();
+  renderSuppliersModule();
+  toast('Payment record removed', 'warning');
+}
+
+function renderSupplierPaymentsTable() {
+  const search = (document.getElementById('supplierPaymentSearch')?.value || '').toLowerCase().trim();
+  const filterSup = document.getElementById('supplierPaymentFilter')?.value || '';
+
+  let list = [...(db.supplierPayments || [])].reverse().filter(p => {
+    if (filterSup && p.supplierId !== filterSup) return false;
+    if (!search) return true;
+    return (p.id || '').toLowerCase().includes(search) ||
+      (p.supplierName || '').toLowerCase().includes(search) ||
+      (p.reference || '').toLowerCase().includes(search) ||
+      (p.chequeNo || '').toLowerCase().includes(search) ||
+      (p.notes || '').toLowerCase().includes(search);
+  });
+
+  const summary = document.getElementById('paymentListSummary');
+  if (summary) summary.textContent = `${list.length} payments recorded`;
+
+  const tbody = document.getElementById('supplierPaymentsTableBody');
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">No supplier payments recorded</td></tr>';
+    return;
+  }
+
+  const methodIcons = {
+    cash: '💵 Cash',
+    bank: '🏦 Bank Transfer',
+    cheque: '📑 Cheque',
+    online: '📱 Online / Card'
+  };
+
+  tbody.innerHTML = list.map(p => `
+    <tr>
+      <td><span style="color:var(--accent-blue);font-weight:700;">${p.id}</span></td>
+      <td style="font-size:12px;">${p.date}</td>
+      <td style="font-weight:600;">${p.supplierName}</td>
+      <td><span class="badge ${p.paymentMethod === 'cheque' ? 'badge-orange' : (p.paymentMethod === 'cash' ? 'badge-green' : 'badge-blue')}">${methodIcons[p.paymentMethod] || p.paymentMethod}</span></td>
+      <td style="font-weight:700;color:var(--accent-green);font-size:14px;">${fmt(p.amount)}</td>
+      <td>
+        ${p.paymentMethod === 'cheque' ? `
+          <div style="font-size:11px;font-weight:700;color:var(--accent-orange);">Chq: ${p.chequeNo}</div>
+          ${p.chequeDate ? `<div style="font-size:10px;color:var(--text-muted);">Date: ${p.chequeDate}</div>` : ''}
+          ${p.bankName ? `<div style="font-size:10px;color:var(--text-muted);">${p.bankName}</div>` : ''}
+        ` : (p.reference ? `<span style="font-size:11px;color:var(--text-secondary);">${p.reference}</span>` : '-')}
+      </td>
+      <td style="font-size:11px;color:var(--text-muted);max-width:180px;">${p.notes || '-'}</td>
+      <td>
+        <div class="action-group">
+          <button class="btn-sm btn-secondary" onclick="viewSupplierVoucher('${p.id}')">🧾 Voucher</button>
+          <button class="btn-sm btn-danger" onclick="deleteSupplierPayment('${p.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ===== SUPPLIER PURCHASE INVOICES (GRN) =====
+function openSupplierPurchaseModal(supplierId = null) {
+  populateSupplierDropdowns();
+  document.getElementById('editPurchaseId').value = '';
+  document.getElementById('supplierPurchaseModalTitle').textContent = '📥 Add Supplier Purchase Bill';
+  document.getElementById('purBillNo').value = 'BILL-' + Date.now().toString().slice(-6);
+  document.getElementById('purDate').value = new Date().toISOString().split('T')[0];
+  const dueD = new Date();
+  dueD.setDate(dueD.getDate() + 30);
+  document.getElementById('purDueDate').value = dueD.toISOString().split('T')[0];
+  document.getElementById('purTotalAmount').value = '';
+  document.getElementById('purPaidAmount').value = '0';
+  document.getElementById('purItemsNote').value = '';
+  calcPurchaseDue();
+
+  const sel = document.getElementById('purSupplierSelect');
+  if (supplierId && sel) sel.value = supplierId;
+
+  openModal('supplierPurchaseModal');
+}
+
+function calcPurchaseDue() {
+  const total = parseFloat(document.getElementById('purTotalAmount')?.value) || 0;
+  const paid = parseFloat(document.getElementById('purPaidAmount')?.value) || 0;
+  const due = Math.max(0, total - paid);
+  const el = document.getElementById('purDueDisplay');
+  if (el) {
+    el.textContent = `Due Balance: ${fmt(due)}`;
+    el.style.color = due > 0 ? 'var(--accent-orange)' : 'var(--accent-green)';
+  }
+}
+
+function saveSupplierPurchase() {
+  const supplierId = document.getElementById('purSupplierSelect')?.value;
+  const billNo = document.getElementById('purBillNo')?.value.trim();
+  const date = document.getElementById('purDate')?.value;
+  const totalAmount = parseFloat(document.getElementById('purTotalAmount')?.value);
+  const paidAmount = parseFloat(document.getElementById('purPaidAmount')?.value) || 0;
+
+  if (!supplierId) { toast('Please choose a supplier!', 'error'); return; }
+  if (!billNo || !date || isNaN(totalAmount) || totalAmount <= 0) {
+    toast('Please enter valid bill number, date, and amount!', 'error'); return;
+  }
+
+  const sup = (db.suppliers || []).find(s => s.id === supplierId);
+  const dueAmount = Math.max(0, totalAmount - paidAmount);
+  const status = paidAmount >= totalAmount ? 'paid' : (paidAmount > 0 ? 'partial' : 'unpaid');
+  const itemsNote = document.getElementById('purItemsNote')?.value.trim() || '';
+  const dueDate = document.getElementById('purDueDate')?.value || '';
+
+  const purchase = {
+    id: 'PUR' + Date.now().toString().slice(-7),
+    supplierId,
+    supplierName: sup ? (sup.company ? `${sup.name} (${sup.company})` : sup.name) : 'Supplier',
+    billNo,
+    date,
+    dueDate,
+    totalAmount,
+    paidAmount,
+    dueAmount,
+    status,
+    itemsNote,
+    createdAt: new Date().toISOString()
+  };
+
+  if (!db.supplierPurchases) db.supplierPurchases = [];
+  db.supplierPurchases.push(purchase);
+
+  if (paidAmount > 0) {
+    if (!db.supplierPayments) db.supplierPayments = [];
+    db.supplierPayments.push({
+      id: 'SPAY' + Date.now().toString().slice(-7),
+      supplierId,
+      supplierName: purchase.supplierName,
+      date,
+      amount: paidAmount,
+      paymentMethod: 'cash',
+      reference: `Bill #${billNo}`,
+      bankName: '',
+      chequeNo: '',
+      chequeDate: '',
+      notes: `Immediate payment for bill #${billNo}`,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  saveData();
+  closeModal('supplierPurchaseModal');
+  renderSuppliersModule();
+  toast(`Purchase bill #${billNo} saved successfully! 📦`, 'success');
+}
+
+function deleteSupplierPurchase(purchaseId) {
+  if (!confirm('Delete this purchase bill record?')) return;
+  db.supplierPurchases = (db.supplierPurchases || []).filter(p => p.id !== purchaseId);
+  saveData();
+  renderSuppliersModule();
+  toast('Purchase bill deleted', 'warning');
+}
+
+function renderSupplierPurchasesTable() {
+  const search = (document.getElementById('supplierPurchaseSearch')?.value || '').toLowerCase().trim();
+  const filterSup = document.getElementById('supplierPurchaseFilter')?.value || '';
+
+  let list = [...(db.supplierPurchases || [])].reverse().filter(p => {
+    if (filterSup && p.supplierId !== filterSup) return false;
+    if (!search) return true;
+    return (p.billNo || '').toLowerCase().includes(search) ||
+      (p.supplierName || '').toLowerCase().includes(search) ||
+      (p.itemsNote || '').toLowerCase().includes(search);
+  });
+
+  const summary = document.getElementById('purchaseListSummary');
+  if (summary) summary.textContent = `${list.length} purchase bills`;
+
+  const tbody = document.getElementById('supplierPurchasesTableBody');
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-cell">No purchase bills found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(p => {
+    let statusBadge = '<span class="badge badge-green">✓ Paid</span>';
+    if (p.status === 'unpaid') statusBadge = '<span class="badge badge-red">Unpaid</span>';
+    else if (p.status === 'partial') statusBadge = '<span class="badge badge-orange">Partial</span>';
+
+    return `
+      <tr>
+        <td><strong style="color:var(--accent-blue);">${p.billNo}</strong></td>
+        <td style="font-size:12px;">${p.date}</td>
+        <td style="font-weight:600;">${p.supplierName}</td>
+        <td style="font-size:11px;max-width:200px;color:var(--text-secondary);">${p.itemsNote || '-'}</td>
+        <td style="font-weight:700;">${fmt(p.totalAmount)}</td>
+        <td style="font-weight:600;color:var(--accent-green);">${fmt(p.paidAmount)}</td>
+        <td style="font-weight:700;color:${p.dueAmount > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${fmt(p.dueAmount)}</td>
+        <td>${statusBadge}</td>
+        <td>
+          <div class="action-group">
+            ${p.dueAmount > 0 ? `<button class="btn-sm btn-green" onclick="openSupplierPaymentModal('${p.supplierId}')">💳 Pay Due</button>` : ''}
+            <button class="btn-sm btn-danger" onclick="deleteSupplierPurchase('${p.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ===== SUPPLIER VOUCHER & STATEMENT =====
+function viewSupplierVoucher(paymentId) {
+  const p = (db.supplierPayments || []).find(x => x.id === paymentId);
+  if (!p) return;
+  showSupplierVoucher(p);
+}
+
+function showSupplierVoucher(payment) {
+  const sup = (db.suppliers || []).find(s => s.id === payment.supplierId);
+  const st = getSupplierStats(payment.supplierId);
+  const box = document.getElementById('supplierVoucherContent');
+  if (!box) return;
+
+  const methodNames = {
+    cash: '💵 CASH',
+    bank: '🏦 BANK TRANSFER / DEPOSIT',
+    cheque: '📑 CHEQUE',
+    online: '📱 ONLINE / CARD'
+  };
+
+  box.innerHTML = `
+    <div class="voucher-print-card" id="voucherPrintable">
+      <div class="voucher-header">
+        <h2 style="font-size:16px;font-weight:900;letter-spacing:0.5px;text-transform:uppercase;">${db.settings.shopName}</h2>
+        <p style="font-size:9.5px;color:#333;">${db.settings.address || 'Main Street, Padaviya'} | 📞 ${db.settings.phone}</p>
+        <div class="voucher-title" style="margin-top:6px;color:#000;border:1px solid #000;display:inline-block;padding:2px 8px;border-radius:3px;">
+          PAYMENT VOUCHER
+        </div>
+      </div>
+
+      <div style="margin-bottom:8px;font-size:10px;">
+        <div class="voucher-row">
+          <span><b>Voucher No:</b> ${payment.id}</span>
+          <span><b>Date:</b> ${payment.date}</span>
+        </div>
+        <div class="voucher-row">
+          <span><b>Supplier:</b> ${payment.supplierName}</span>
+        </div>
+        ${sup?.phone ? `
+          <div class="voucher-row">
+            <span><b>Phone:</b> ${sup.phone}</span>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="voucher-amount-box">
+        <div style="font-size:10px;text-transform:uppercase;color:#444;font-weight:700;">AMOUNT PAID</div>
+        <div style="font-size:18px;font-weight:900;color:#000;margin:2px 0;">${fmt(payment.amount)}</div>
+      </div>
+
+      <div style="font-size:10px;margin-bottom:8px;">
+        <div class="voucher-row">
+          <span><b>Payment Mode:</b></span>
+          <span><b>${methodNames[payment.paymentMethod] || payment.paymentMethod.toUpperCase()}</b></span>
+        </div>
+        ${payment.paymentMethod === 'cheque' ? `
+          <div class="voucher-row">
+            <span><b>Cheque No:</b></span>
+            <span>${payment.chequeNo}</span>
+          </div>
+          ${payment.chequeDate ? `
+            <div class="voucher-row">
+              <span><b>Cheque Date:</b></span>
+              <span>${payment.chequeDate}</span>
+            </div>
+          ` : ''}
+        ` : ''}
+        ${payment.reference ? `
+          <div class="voucher-row">
+            <span><b>Reference:</b></span>
+            <span>${payment.reference}</span>
+          </div>
+        ` : ''}
+        ${payment.notes ? `
+          <div class="voucher-row">
+            <span><b>Note:</b></span>
+            <span>${payment.notes}</span>
+          </div>
+        ` : ''}
+        <div class="voucher-row" style="margin-top:6px;border-top:1px dashed #ccc;padding-top:4px;">
+          <span><b>Remaining Due Balance:</b></span>
+          <span style="font-weight:800;">${fmt(st.due)}</span>
+        </div>
+      </div>
+
+      <div class="voucher-signatures">
+        <div>
+          <div class="sig-line">Prepared By</div>
+        </div>
+        <div>
+          <div class="sig-line">Supplier Signature</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:7.5px;color:#777;margin-top:10px;">
+        Develop By SMARTZONE LK
+      </div>
+    </div>
+  `;
+
+  openModal('supplierVoucherModal');
+}
+
+function printSupplierVoucher() {
+  const voucherEl = document.getElementById('voucherPrintable');
+  if (!voucherEl) { toast('No voucher to print!', 'warning'); return; }
+
+  const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Payment Voucher - ${db.settings.shopName}</title>
+      <style>
+        @page { size: 80mm auto; margin: 2mm 3mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+          width: 74mm; max-width: 74mm; margin: 0 auto;
+          padding: 2mm 1mm; background: #fff; color: #000;
+          font-family: Arial, sans-serif; font-size: 11px;
+        }
+        .voucher-header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+        .voucher-title { font-size: 13px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid #000; display: inline-block; padding: 1px 6px; margin-top: 4px; }
+        .voucher-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 10px; }
+        .voucher-amount-box { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 6px 0; margin: 6px 0; text-align: center; }
+        .voucher-signatures { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 6px; font-size: 9px; text-align: center; }
+        .sig-line { border-top: 1px dotted #000; width: 85px; padding-top: 2px; }
+      </style>
+    </head>
+    <body>
+      ${voucherEl.innerHTML}
+    </body>
+    </html>
+  `;
+  printContent(printHtml, 'Supplier Voucher');
+}
+
+// Supplier Ledger / Statement
+function openSupplierLedger(supplierId) {
+  const sup = (db.suppliers || []).find(s => s.id === supplierId);
+  if (!sup) return;
+
+  const st = getSupplierStats(supplierId);
+  document.getElementById('supplierLedgerTitle').textContent = `📋 Statement: ${sup.name} ${sup.company ? `(${sup.company})` : ''}`;
+
+  const purchases = (db.supplierPurchases || []).filter(p => p.supplierId === supplierId).map(p => ({
+    date: p.date,
+    type: 'purchase',
+    label: `📥 Bill: ${p.billNo}`,
+    description: p.itemsNote || 'Stock inward',
+    debit: p.totalAmount,
+    credit: 0
+  }));
+
+  const payments = (db.supplierPayments || []).filter(p => p.supplierId === supplierId).map(p => ({
+    date: p.date,
+    type: 'payment',
+    label: `💳 Payment: ${p.id}`,
+    description: p.paymentMethod.toUpperCase() + (p.chequeNo ? ` (Chq #${p.chequeNo})` : '') + (p.notes ? ` - ${p.notes}` : ''),
+    debit: 0,
+    credit: p.amount
+  }));
+
+  let transactions = [...purchases, ...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  let runningBalance = parseFloat(sup.openingBalance) || 0;
+  const ledgerRows = transactions.map(t => {
+    runningBalance += t.debit - t.credit;
+    return `
+      <tr>
+        <td style="font-size:12px;">${t.date}</td>
+        <td><strong>${t.label}</strong></td>
+        <td style="font-size:11.5px;color:var(--text-secondary);">${t.description}</td>
+        <td style="text-align:right;color:var(--accent-orange);font-weight:600;">${t.debit > 0 ? fmt(t.debit) : '-'}</td>
+        <td style="text-align:right;color:var(--accent-green);font-weight:600;">${t.credit > 0 ? fmt(t.credit) : '-'}</td>
+        <td style="text-align:right;font-weight:700;color:${runningBalance > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${fmt(runningBalance)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const content = document.getElementById('supplierLedgerContent');
+  if (content) {
+    content.innerHTML = `
+      <div id="supplierLedgerPrintable">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h4 style="font-size:18px;font-weight:800;color:var(--text-primary);">${sup.name}</h4>
+            ${sup.company ? `<div style="font-size:13px;color:var(--accent-blue);font-weight:600;">🏢 ${sup.company}</div>` : ''}
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">📞 ${sup.phone} | 📍 ${sup.address || '-'}</div>
+            ${sup.bankInfo ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🏦 Bank: ${sup.bankInfo}</div>` : ''}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:var(--text-muted);">OUTSTANDING DUE</div>
+            <div style="font-size:20px;font-weight:900;color:${st.due > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">${fmt(st.due)}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Purchases: ${fmt(st.totalPurchases)} | Paid: ${fmt(st.totalPaid)}</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Transaction</th>
+                <th>Details</th>
+                <th style="text-align:right;">Bill / Debit</th>
+                <th style="text-align:right;">Payment / Credit</th>
+                <th style="text-align:right;">Balance Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sup.openingBalance > 0 ? `
+                <tr style="background:rgba(255,255,255,0.02);">
+                  <td>-</td>
+                  <td><strong>Opening Balance</strong></td>
+                  <td style="color:var(--text-muted);">Previous balance forward</td>
+                  <td style="text-align:right;font-weight:600;">${fmt(sup.openingBalance)}</td>
+                  <td style="text-align:right;">-</td>
+                  <td style="text-align:right;font-weight:700;color:var(--accent-red);">${fmt(sup.openingBalance)}</td>
+                </tr>
+              ` : ''}
+              ${ledgerRows || '<tr><td colspan="6" class="empty-cell">No transactions recorded for this supplier</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  openModal('supplierLedgerModal');
+}
+
+function printSupplierStatement() {
+  const el = document.getElementById('supplierLedgerPrintable');
+  if (!el) return;
+  const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Supplier Statement - ${db.settings.shopName}</title>
+      <style>
+        @page { size: A4 portrait; margin: 12mm; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; color: #000; background: #fff; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 11px; }
+        th, td { border: 1px solid #ccc; padding: 6px 8px; }
+        th { background: #f0f0f0; text-align: left; }
+      </style>
+    </head>
+    <body>
+      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px;">
+        <h2>${db.settings.shopName}</h2>
+        <p>${db.settings.address || 'Main Street, Padaviya'} | Phone: ${db.settings.phone}</p>
+        <h3 style="margin-top:6px;letter-spacing:1px;">SUPPLIER ACCOUNT STATEMENT</h3>
+      </div>
+      ${el.innerHTML}
+      <div style="margin-top:30px;display:flex;justify-content:space-between;padding-top:10px;">
+        <div style="border-top:1px dotted #000;width:150px;text-align:center;padding-top:4px;">Prepared By</div>
+        <div style="border-top:1px dotted #000;width:150px;text-align:center;padding-top:4px;">Supplier Signature</div>
+      </div>
+    </body>
+    </html>
+  `;
+  printContent(printHtml, 'Supplier Statement');
+}
+
+function seedInitialSuppliers() {
+  db.suppliers = [
+    {
+      id: 'SUP1',
+      name: 'Nuwan Perera',
+      company: 'Colombo Mobile Parts Hub',
+      phone: '0771234567',
+      email: 'colomboparts@example.lk',
+      categories: 'Displays & Spare Parts',
+      address: '1st Cross Street, Pettah, Colombo 11',
+      bankInfo: 'Commercial Bank - A/C 8001234567 (Pettah)',
+      openingBalance: 0,
+      notes: 'Samsung & iPhone screens, battery packs',
+      createdAt: new Date(Date.now() - 10 * 86400000).toISOString()
+    },
+    {
+      id: 'SUP2',
+      name: 'Sanjeewa Bandara',
+      company: 'Apex Tech Accessories',
+      phone: '0719876543',
+      email: 'apextech@example.lk',
+      categories: 'Accessories, Cables & Chargers',
+      address: 'Main Street, Kurunegala',
+      bankInfo: 'BOC - A/C 1234567890 (Kurunegala)',
+      openingBalance: 0,
+      notes: 'Fast chargers, cables, universal tempered glasses',
+      createdAt: new Date(Date.now() - 7 * 86400000).toISOString()
+    },
+    {
+      id: 'SUP3',
+      name: 'Mohamed Rizwan',
+      company: 'City Phone Distributors',
+      phone: '0765558899',
+      email: 'cityphones@example.lk',
+      categories: 'Brand New & Used Phones',
+      address: 'Anuradhapura Road, Vavuniya',
+      bankInfo: 'Sampath Bank - A/C 0029384756',
+      openingBalance: 0,
+      notes: 'Realme, Samsung phones delivery',
+      createdAt: new Date(Date.now() - 5 * 86400000).toISOString()
+    }
+  ];
+
+  db.supplierPurchases = [
+    {
+      id: 'PUR-101',
+      supplierId: 'SUP1',
+      supplierName: 'Nuwan Perera (Colombo Mobile Parts Hub)',
+      billNo: 'INV-CMP-8821',
+      date: new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      totalAmount: 95000,
+      paidAmount: 45000,
+      dueAmount: 50000,
+      status: 'partial',
+      itemsNote: '5x Samsung A55 Displays, 3x iPhone 15 Screens, 10x Battery Packs',
+      createdAt: new Date(Date.now() - 6 * 86400000).toISOString()
+    },
+    {
+      id: 'PUR-102',
+      supplierId: 'SUP2',
+      supplierName: 'Sanjeewa Bandara (Apex Tech Accessories)',
+      billNo: 'APX-7734',
+      date: new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 20 * 86400000).toISOString().split('T')[0],
+      totalAmount: 38000,
+      paidAmount: 38000,
+      dueAmount: 0,
+      status: 'paid',
+      itemsNote: '50x Type-C Cables, 50x Tempered Glass Universal, 20x 25W Fast Chargers',
+      createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
+    }
+  ];
+
+  db.supplierPayments = [
+    {
+      id: 'SPAY-1001',
+      supplierId: 'SUP1',
+      supplierName: 'Nuwan Perera (Colombo Mobile Parts Hub)',
+      date: new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0],
+      amount: 45000,
+      paymentMethod: 'bank',
+      reference: 'SLIP-CB-908231',
+      bankName: 'Commercial Bank',
+      chequeNo: '',
+      chequeDate: '',
+      notes: 'Initial bank deposit for Bill #INV-CMP-8821',
+      createdAt: new Date(Date.now() - 6 * 86400000).toISOString()
+    },
+    {
+      id: 'SPAY-1002',
+      supplierId: 'SUP2',
+      supplierName: 'Sanjeewa Bandara (Apex Tech Accessories)',
+      date: new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0],
+      amount: 38000,
+      paymentMethod: 'cash',
+      reference: 'CASH-REC',
+      bankName: '',
+      chequeNo: '',
+      chequeDate: '',
+      notes: 'Full payment on delivery for Bill #APX-7734',
+      createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
+    }
+  ];
+}
+
 // ===== BARCODE =====
 function initBarcodeSelect() {
   const sel = document.getElementById('barcodeProduct');
@@ -2412,6 +3391,7 @@ function renderSettings() {
   document.getElementById('dataCountRepairs').textContent = db.repairs.length;
   document.getElementById('dataCountCustomers').textContent = db.customers.length;
   document.getElementById('dataCountWarranty').textContent = db.warranty.length;
+  if (document.getElementById('dataCountSuppliers')) document.getElementById('dataCountSuppliers').textContent = (db.suppliers || []).length;
 
   renderCategoriesList();
 
@@ -2870,6 +3850,8 @@ function addDemoData() {
     { id: 'C2', name: 'Nimal Silva', phone: '0776543210', address: 'Kekirawa', email: '', nic: '', createdAt: new Date().toISOString() }
   ];
 
+  saveData();
+  seedInitialSuppliers();
   saveData();
   updateDashboard();
   toast('Welcome to SH Mobile ERP! Demo data loaded. 🎉', 'success');

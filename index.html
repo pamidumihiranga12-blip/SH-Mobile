@@ -46,6 +46,10 @@
       <span class="nav-icon">📊</span>
       <span class="nav-text">Barcode</span>
     </a>
+    <a href="javascript:void(0)" class="nav-item" onclick="showPage('suppliers', this)">
+      <span class="nav-icon">🚚</span>
+      <span class="nav-text">Suppliers</span>
+    </a>
 
     <div class="nav-section-label">SERVICES</div>
     <a href="javascript:void(0)" class="nav-item" onclick="showPage('repairs', this)">
@@ -191,6 +195,16 @@
         </div>
         <div id="recentSalesList" class="list-container">
           <div class="empty-state-sm">No sales yet</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>🚚 Supplier Payables (Due Balances)</h3>
+          <button class="btn-sm btn-primary" onclick="showPage('suppliers', null)">Manage</button>
+        </div>
+        <div id="supplierPayablesDashList" class="list-container">
+          <div class="empty-state-sm">No supplier dues ✓</div>
         </div>
       </div>
     </div>
@@ -677,6 +691,170 @@
             <tr><td colspan="6" class="empty-cell">No customers yet</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SUPPLIERS & SUPPLIER PAYMENTS PAGE ===== -->
+  <div class="page" id="page-suppliers">
+    <!-- Top Stat Summary Cards -->
+    <div class="stats-grid">
+      <div class="stat-card stat-blue">
+        <div class="stat-icon">🚚</div>
+        <div class="stat-info">
+          <p class="stat-label">Total Suppliers</p>
+          <h3 class="stat-value" id="supTotalCount">0</h3>
+        </div>
+      </div>
+      <div class="stat-card stat-purple">
+        <div class="stat-icon">📦</div>
+        <div class="stat-info">
+          <p class="stat-label">Total Purchases</p>
+          <h3 class="stat-value" id="supTotalPurchases">Rs. 0.00</h3>
+        </div>
+      </div>
+      <div class="stat-card stat-green">
+        <div class="stat-icon">💳</div>
+        <div class="stat-info">
+          <p class="stat-label">Total Payments Made</p>
+          <h3 class="stat-value" id="supTotalPayments">Rs. 0.00</h3>
+        </div>
+      </div>
+      <div class="stat-card stat-red">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-info">
+          <p class="stat-label">Outstanding Payables</p>
+          <h3 class="stat-value" id="supTotalDue" style="color:var(--accent-red);">Rs. 0.00</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-navigation Tabs and Action Buttons -->
+    <div class="supplier-header-bar">
+      <div class="module-tabs">
+        <button type="button" class="module-tab-btn active" id="tabBtn-suppliers" onclick="switchSupplierTab('directory')">
+          <span>🚚 Suppliers</span>
+          <span class="module-tab-badge" id="badgeSupCount">0</span>
+        </button>
+        <button type="button" class="module-tab-btn" id="tabBtn-payments" onclick="switchSupplierTab('payments')">
+          <span>💳 Payment History</span>
+          <span class="module-tab-badge" id="badgePaymentCount">0</span>
+        </button>
+        <button type="button" class="module-tab-btn" id="tabBtn-purchases" onclick="switchSupplierTab('purchases')">
+          <span>📥 Purchase Bills / Invoices</span>
+          <span class="module-tab-badge" id="badgePurchasesCount">0</span>
+        </button>
+      </div>
+
+      <div class="supplier-quick-actions">
+        <button type="button" class="btn-primary" onclick="openSupplierModal()">+ Add Supplier</button>
+        <button type="button" class="btn-green" onclick="openSupplierPaymentModal()">💳 Make Payment</button>
+        <button type="button" class="btn-secondary" onclick="openSupplierPurchaseModal()">📥 Add Purchase Bill</button>
+      </div>
+    </div>
+
+    <!-- TAB 1: SUPPLIERS DIRECTORY -->
+    <div id="supplierTabContent-directory" class="supplier-tab-pane">
+      <div class="page-actions" style="margin-bottom:14px;">
+        <input type="text" id="supplierSearch" placeholder="🔍 Search supplier by name, company, phone, category..." oninput="renderSuppliersTable()" class="input-field">
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>🚚 Registered Suppliers</h3>
+          <span id="supplierListSummary" style="font-size:12px;color:var(--text-secondary);">Showing 0 suppliers</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Supplier / Company</th>
+                <th>Contact</th>
+                <th>Categories / Items</th>
+                <th>Total Purchases</th>
+                <th>Total Paid</th>
+                <th>Outstanding Due</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="suppliersTableBody">
+              <tr><td colspan="8" class="empty-cell">No suppliers registered yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: SUPPLIER PAYMENT HISTORY -->
+    <div id="supplierTabContent-payments" class="supplier-tab-pane" style="display:none;">
+      <div class="page-actions" style="margin-bottom:14px;">
+        <input type="text" id="supplierPaymentSearch" placeholder="🔍 Search payment by supplier, ref, notes, cheque #..." oninput="renderSupplierPaymentsTable()" class="input-field">
+        <select id="supplierPaymentFilter" class="input-field" style="max-width:240px;" onchange="renderSupplierPaymentsTable()">
+          <option value="">All Suppliers</option>
+        </select>
+        <button type="button" class="btn-green" onclick="openSupplierPaymentModal()">+ New Payment</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>💳 Supplier Payment Records</h3>
+          <span id="paymentListSummary" style="font-size:12px;color:var(--text-secondary);">0 payments</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Voucher #</th>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Method</th>
+                <th>Amount Paid</th>
+                <th>Reference / Cheque Details</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="supplierPaymentsTableBody">
+              <tr><td colspan="8" class="empty-cell">No payment records found</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: PURCHASE INVOICES / BILLS -->
+    <div id="supplierTabContent-purchases" class="supplier-tab-pane" style="display:none;">
+      <div class="page-actions" style="margin-bottom:14px;">
+        <input type="text" id="supplierPurchaseSearch" placeholder="🔍 Search bills by bill no, supplier, items..." oninput="renderSupplierPurchasesTable()" class="input-field">
+        <select id="supplierPurchaseFilter" class="input-field" style="max-width:240px;" onchange="renderSupplierPurchasesTable()">
+          <option value="">All Suppliers</option>
+        </select>
+        <button type="button" class="btn-secondary" onclick="openSupplierPurchaseModal()">+ New Purchase Bill</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>📥 Supplier Purchase Bills (Stock Inward / GRN)</h3>
+          <span id="purchaseListSummary" style="font-size:12px;color:var(--text-secondary);">0 bills</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Bill / Inv #</th>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Items / Description</th>
+                <th>Total Bill</th>
+                <th>Paid</th>
+                <th>Due Balance</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="supplierPurchasesTableBody">
+              <tr><td colspan="9" class="empty-cell">No purchase bills recorded</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1175,6 +1353,216 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('warrantyModal')">Cancel</button>
       <button class="btn-primary" onclick="saveWarranty()">💾 Save Warranty</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supplier Modal -->
+<div class="modal-overlay" id="supplierModal">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3 id="supplierModalTitle">Add Supplier</h3>
+      <button class="modal-close" onclick="closeModal('supplierModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editSupplierId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Supplier / Contact Name *</label>
+          <input type="text" id="supName" class="input-field" placeholder="e.g. Nuwan Perera">
+        </div>
+        <div class="form-group">
+          <label>Company / Shop Name</label>
+          <input type="text" id="supCompany" class="input-field" placeholder="e.g. Colombo Mobile Parts Hub">
+        </div>
+        <div class="form-group">
+          <label>Phone / WhatsApp *</label>
+          <input type="text" id="supPhone" class="input-field" placeholder="07XXXXXXXX">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="supEmail" class="input-field" placeholder="supplier@example.com">
+        </div>
+        <div class="form-group">
+          <label>Supplied Categories / Items</label>
+          <input type="text" id="supCategories" class="input-field" placeholder="e.g. Displays, Spare Parts, Accessories">
+        </div>
+        <div class="form-group">
+          <label>City / Location</label>
+          <input type="text" id="supAddress" class="input-field" placeholder="e.g. Colombo, Pettah">
+        </div>
+        <div class="form-group full-width">
+          <label>Bank Account Details (For Payments)</label>
+          <input type="text" id="supBankInfo" class="input-field" placeholder="e.g. Commercial Bank - A/C 8001234567 (Pettah Branch)">
+        </div>
+        <div class="form-group">
+          <label>Opening Due Balance (Rs.)</label>
+          <input type="number" id="supOpeningBalance" class="input-field" placeholder="0.00" min="0" step="0.01" value="0">
+        </div>
+        <div class="form-group full-width">
+          <label>Notes / Remarks</label>
+          <textarea id="supNotes" class="input-field" rows="2" placeholder="Payment terms, delivery days, etc..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('supplierModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveSupplier()">💾 Save Supplier</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supplier Payment Modal -->
+<div class="modal-overlay" id="supplierPaymentModal">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3 id="supplierPaymentModalTitle">💳 Make Supplier Payment</h3>
+      <button class="modal-close" onclick="closeModal('supplierPaymentModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editPaymentId">
+      <div class="form-group">
+        <label>Select Supplier *</label>
+        <select id="spSupplierSelect" class="input-field" onchange="onSupplierPaymentSelectChanged()">
+          <option value="">-- Choose Supplier --</option>
+        </select>
+        <div id="spSupplierDueAlert" style="margin-top:6px;font-size:12px;font-weight:700;display:none;"></div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Payment Date *</label>
+          <input type="date" id="spDate" class="input-field">
+        </div>
+        <div class="form-group">
+          <label>Amount Paid (Rs.) *</label>
+          <input type="number" id="spAmount" class="input-field" placeholder="0.00" min="1" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Payment Method *</label>
+          <select id="spMethod" class="input-field" onchange="toggleSupplierPaymentMethodFields()">
+            <option value="cash">💵 Cash (මුදල්)</option>
+            <option value="bank">🏦 Bank Transfer / Deposit</option>
+            <option value="cheque">📑 Cheque (චෙක්පත්)</option>
+            <option value="online">📱 Online Transfer / Card</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label id="spRefLabel">Reference / Slip #</label>
+          <input type="text" id="spReference" class="input-field" placeholder="Receipt / Slip / Ref #">
+        </div>
+      </div>
+
+      <!-- Cheque / Bank Specific Details (Hidden by default, shown when cheque/bank selected) -->
+      <div id="spChequeFields" style="display:none;" class="form-grid">
+        <div class="form-group">
+          <label>Cheque Number *</label>
+          <input type="text" id="spChequeNo" class="input-field" placeholder="e.g. CHQ-889021">
+        </div>
+        <div class="form-group">
+          <label>Cheque Date *</label>
+          <input type="date" id="spChequeDate" class="input-field">
+        </div>
+        <div class="form-group full-width">
+          <label>Bank Name & Branch</label>
+          <input type="text" id="spBankName" class="input-field" placeholder="e.g. Bank of Ceylon / Commercial Bank">
+        </div>
+      </div>
+
+      <div class="form-group full-width">
+        <label>Payment Notes / Details</label>
+        <textarea id="spNotes" class="input-field" rows="2" placeholder="e.g. Payment for invoice #8890, delivered displays..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('supplierPaymentModal')">Cancel</button>
+      <button class="btn-green" onclick="saveSupplierPayment()">💾 Save & Issue Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supplier Purchase Bill Modal -->
+<div class="modal-overlay" id="supplierPurchaseModal">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3 id="supplierPurchaseModalTitle">📥 Add Supplier Purchase Bill</h3>
+      <button class="modal-close" onclick="closeModal('supplierPurchaseModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editPurchaseId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Supplier *</label>
+          <select id="purSupplierSelect" class="input-field">
+            <option value="">-- Choose Supplier --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Supplier Bill / Invoice # *</label>
+          <input type="text" id="purBillNo" class="input-field" placeholder="e.g. INV-8821">
+        </div>
+        <div class="form-group">
+          <label>Bill Date *</label>
+          <input type="date" id="purDate" class="input-field">
+        </div>
+        <div class="form-group">
+          <label>Payment Due Date</label>
+          <input type="date" id="purDueDate" class="input-field">
+        </div>
+        <div class="form-group">
+          <label>Total Bill Amount (Rs.) *</label>
+          <input type="number" id="purTotalAmount" class="input-field" placeholder="0.00" min="0" step="0.01" oninput="calcPurchaseDue()">
+        </div>
+        <div class="form-group">
+          <label>Paid Amount Now (Rs.)</label>
+          <input type="number" id="purPaidAmount" class="input-field" placeholder="0.00" min="0" step="0.01" oninput="calcPurchaseDue()" value="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <div id="purDueDisplay" style="font-size:12.5px;font-weight:700;color:var(--accent-orange);margin-top:2px;">
+          Due Balance: Rs. 0.00
+        </div>
+      </div>
+      <div class="form-group full-width">
+        <label>Received Items / Description</label>
+        <textarea id="purItemsNote" class="input-field" rows="2" placeholder="e.g. 5x Galaxy A55 Displays, 10x iPhone 15 Screens, 25x Type-C Cables..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('supplierPurchaseModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveSupplierPurchase()">💾 Save Purchase Bill</button>
+    </div>
+  </div>
+</div>
+
+<!-- Supplier Payment Voucher Modal -->
+<div class="modal-overlay" id="supplierVoucherModal">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3>🧾 Supplier Payment Voucher</h3>
+      <div>
+        <button class="btn-primary" onclick="printSupplierVoucher()">🖨️ Print Voucher</button>
+        <button class="modal-close" onclick="closeModal('supplierVoucherModal')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="supplierVoucherContent">
+      <!-- Generated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- Supplier Statement / Ledger Modal -->
+<div class="modal-overlay" id="supplierLedgerModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="supplierLedgerTitle">📋 Supplier Statement & Transaction History</h3>
+      <div>
+        <button class="btn-primary btn-sm" onclick="printSupplierStatement()">🖨️ Print Statement</button>
+        <button class="modal-close" onclick="closeModal('supplierLedgerModal')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="supplierLedgerContent">
+      <!-- Generated dynamically -->
     </div>
   </div>
 </div>
